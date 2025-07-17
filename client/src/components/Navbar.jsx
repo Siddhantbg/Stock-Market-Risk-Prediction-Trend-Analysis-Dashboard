@@ -67,7 +67,7 @@ const Navbar = () => {
             onClick={() => handleNavLinkClick(nav.title)}
           >
             <Link
-              to={`/${nav.title.toLowerCase()}`}
+              to={nav.redirect}
               className={`hover:text-blue-500 transition-colors duration-300 ease-in-out`}
             >
               {nav.title}

@@ -172,50 +172,80 @@ const UPI = () => {
 //     }
 // }
 
-const payementHandler = ()=>{}
-  const reqestHadler = () =>{
+const payementHandler = async () => {
+    if (!upi || !amount) {
+      alert("Please fill in all fields");
+      return;
+    }
     try {
-      (async()=>{
-        const res = await api.post('/money-transfer/money-requested', { receiver: upi, amount:amount});
-        console.log(res.data);
-      })();
+      const res = await api.post('/money-transfer/transfer', { 
+        receiver: upi, 
+        amount: amount
+      });
+      alert(res.data.message || "Payment successful!");
     } catch (error) {
-      console.log(error);
+      console.error('Payment error:', error);
+      alert(error.response?.data?.message || "Payment failed. Please try again.");
+    }
+  };
+
+  const reqestHadler = async () => {
+    if (!upi || !amount) {
+      alert("Please fill in all fields");
+      return;
+    }
+    try {
+      const res = await api.post('/money-transfer/money-requested', { 
+        receiver: upi, 
+        amount: amount
+      });
+      alert(res.data.message || "Request sent successfully!");
+    } catch (error) {
+      console.error('Request error:', error);
+      alert(error.response?.data?.message || "Request failed. Please try again.");
     }
   };
 
   return (
-    <div className="bg-boxbg flex flex-col justify-between w-1/4 h-3/5 rounded-lg p-5 mt-20 border">
-      <div className="flex flex-col gap-2">
-        <input
-          type="text"
-          placeholder="UPI Id"
-          onChange={(e) => setUpi(e.target.value)}
-          className="p-4 bg-neutral-700 outline-none rounded-md"
-        />
-        <input
-          type="number"
-          placeholder="Amount"
-          onChange={(e) => setAmount(e.target.value)}
-          className="p-4 bg-neutral-700 outline-none rounded-md"
-        />
+    <div className="bg-[#2d2d2d] flex flex-col justify-between w-full max-w-md mx-auto rounded-xl p-8 border border-gray-700 shadow-2xl">
+      <div className="flex flex-col gap-6 mb-8">
+        <div className="space-y-2">
+          <label className="text-gray-300 text-sm font-medium ml-1">UPI ID</label>
+          <input
+            type="text"
+            placeholder="Enter your UPI ID"
+            value={upi}
+            onChange={(e) => setUpi(e.target.value)}
+            className="w-full p-4 bg-[#1a1a1a] text-white outline-none rounded-xl border border-gray-700 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 transition-all placeholder:text-gray-500"
+          />
+        </div>
+        <div className="space-y-2">
+          <label className="text-gray-300 text-sm font-medium ml-1">Amount (₹)</label>
+          <input
+            type="number"
+            placeholder="Enter amount"
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
+            className="w-full p-4 bg-[#1a1a1a] text-white outline-none rounded-xl border border-gray-700 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 transition-all placeholder:text-gray-500"
+          />
+        </div>
       </div>
-      <div className="flex flex-col items-center">
-        <div className="flex w-full gap-2">
+      <div className="flex flex-col items-center space-y-6">
+        <div className="flex w-full gap-4">
           <button
             onClick={reqestHadler}
-            className="rounded-full w-full p-3 bg-blue-800"
+            className="flex-1 py-4 px-6 rounded-xl bg-gradient-to-r from-blue-600 to-blue-700 text-white font-semibold shadow-lg hover:from-blue-700 hover:to-blue-800 transition-all duration-300 focus:ring-2 focus:ring-blue-500/20"
           >
-            Request
+            Request Money
           </button>
           <button
             onClick={payementHandler}
-            className="rounded-full w-full p-3 bg-fadeBlue"
+            className="flex-1 py-4 px-6 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 text-white font-semibold shadow-lg hover:from-emerald-600 hover:to-teal-600 transition-all duration-300 focus:ring-2 focus:ring-emerald-500/20"
           >
-            Pay
+            Send Money
           </button>
         </div>
-        <p className="text-sm mt-3 font-thin"> powered by Us</p>
+        <p className="text-sm font-medium text-gray-400">Powered by RishiPay</p>
       </div>
     </div>
   );

@@ -1,12 +1,11 @@
 import React from "react";
-import { Navigate } from "react-router-dom";
+import { Navigate, Outlet } from "react-router-dom";
 
-// Example usage: <PrivateRoute isAuthenticated={userIsLoggedIn}><Dashboard /></PrivateRoute>
-const PrivateRoute = ({ isAuthenticated, children }) => {
+const PrivateRoute = ({ isAuthenticated }) => {
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
   }
-  return children;
+  return <Outlet />;
 };
 
 export default PrivateRoute;

@@ -1,6 +1,6 @@
 import React, { Suspense, useEffect, useState } from 'react'
 import styles from "./style";
-import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
+import { Routes, Route, useLocation } from "react-router-dom";
 import Home from './pages/Home';
 import Profile from './pages/Profile';
 import LoginPage from './components/Auth/LoginPage';
@@ -17,49 +17,44 @@ import Loader from './components/Loader.jsx';
 import Bank from './pages/Bank.jsx';
 import MainTransaction from './pages/MainTransaction.jsx';
 import Payements from './pages/Payements.jsx';
+import StockMarket from './pages/StockMarket.jsx';
 
 const App = () => {
-  const [tt , setToken] = useState("");
+  const [tt, setToken] = useState("");
 
-  useEffect(()=>{
+  useEffect(() => {
     const token = Cookies.get('token');
     setToken(token);
+  }, []);
 
-  })
   return (
     <div className="bg-primary w-full overflow-hidden">
-      <Router>
       <div className={`${styles.paddingX} ${styles.flexCenter}`}>
-      <div className={`${styles.boxWidth}`}>
-        <Navbar />
+        <div className={`${styles.boxWidth}`}>
+          <Navbar />
+        </div>
       </div>
-    </div>
       <Suspense fallback={<Loader />}>
-          <Routes>
-            <Route path="/" element={<Home />}></Route>
-            <Route path="/login" element={<LoginPage />
-            } />
-            <Route path="/register" element={<RegisterPage />} />
-            <Route path="/flash loans" element={<Loan/>} />
-            <Route path="/crypto tracker" element={<CryptoTracker />} />
+        <Routes>
+          <Route path="/" element={<Home />} />
+          <Route path="login" element={<LoginPage />} />
+          <Route path="register" element={<RegisterPage />} />
+          <Route path="flash-loans" element={<Loan/>} />
+          <Route path="crypto-tracker" element={<CryptoTracker />} />
+          <Route path="crypto-to-upi" element={<Payements />} />
 
-            {/* only if user is login */}
-            <Route 
-              element={<ProtectedRoute  isAuthenticated={tt ? true : false} />}
-            >
-              <Route path="/profile" element={<Profile />} />
-              <Route path="/test" element={<test />} />
-              <Route path="/dashboard" element={<Dashboard />} />
-              <Route path="/transaction" element={<TransactionForm />} />
-              <Route path="/cryptupi" element={<Payements />} />
-              <Route path="/KYC" element={<Bank />} />
-              <Route path="/bank detail" element={<MainTransaction />} />
-              {/* <Route path="/requests" element={<Request />} /> */}
-            </Route>
-            <Route path="/*" element={<NotFound />} />
-          </Routes>
+          <Route element={<ProtectedRoute isAuthenticated={!!tt} />}>
+            <Route path="profile" element={<Profile />} />
+            <Route path="dashboard" element={<Dashboard />} />
+            <Route path="transaction" element={<TransactionForm />} />
+            <Route path="kyc" element={<Bank />} />
+            <Route path="bank-detail" element={<MainTransaction />} />
+            <Route path="stock-market" element={<StockMarket />} />
+          </Route>
+
+          <Route path="*" element={<NotFound />} />
+        </Routes>
       </Suspense>
-      </Router>
     </div>
   )
 }

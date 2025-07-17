@@ -4,22 +4,22 @@ export const navLinks = [
   {
     id: "product",
     title: "Take Loans",
-    redirect:'/loans'
+    redirect:'/flash-loans'
   },
   {
     id: "clients",
     title: "Crypto to UPI",
-    redirect:'/loans'
+    redirect:'/crypto-to-upi'
   },
   {
     id: "home",
     title: "Stock Market",
-    redirect:'/loans'
+    redirect:'/stock-market'
   },
   {
     id: "features",
     title: "Crypto Tracker",
-    redirect:'/loans'
+    redirect:'/crypto-tracker'
   },
   
 ];

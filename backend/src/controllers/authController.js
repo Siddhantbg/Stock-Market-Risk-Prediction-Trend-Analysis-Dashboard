@@ -1,4 +1,3 @@
-
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const User = require('../models/User.js');
@@ -137,25 +136,24 @@ const update = async(req, res)=>{
 
 // get user details
 const details = async (req, res) => {
+  const { email } = req.body;
+
   try {
-    const { email } = req.body;
-    if (!email) {
-      return res.status(400).json({ message: 'Email is required' });
-    }
-    const user = await User.findOne({ email }).select('-password');
+    const user = await User.findOne({ email });
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
-    return res.status(200).json({ user });
-  } catch (error) {
-    return res.status(500).json({ message: 'Server error' });
+    res.json({ user });
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).send('Server error');
   }
-}
+};
 
 module.exports = {
   register,
   login,
   linking,
-  update,
-  details
+  details,
+  update
 };

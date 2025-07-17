@@ -1,10 +1,7 @@
-
 import React, { useEffect, useState } from 'react';
 import { FiArrowUp } from 'react-icons/fi';
-import Navbar from '../components/Navbar';
-
-// import { ConnectWallet, useAddress, useBalance, useContract, useTransferToken  } from '@thirdweb-dev/react';
-// import { useContractRead, useContractWrite } from '@thirdweb-dev/react';
+import { ConnectWallet, useAddress, useBalance, useContract, useTransferToken } from '@thirdweb-dev/react';
+import { useContractRead, useContractWrite } from '@thirdweb-dev/react';
 import { ethers } from 'ethers';
 import axios from 'axios';
 
@@ -15,17 +12,12 @@ const Loan = () => {
   const [flash, setFlash] = useState(false);
   const [depositAmt, setDepositAmt] = useState(0);
   const [connected, setConnected] = useState(false);
-  
   const [loanAmount, setLoanAmount] = useState(0);
-  const [foundPair, setFoundPair] = useState('USDC - DAI'); // exchange pair used in dex.sol
+  const [foundPair, setFoundPair] = useState('USDC - DAI');
   const [estimatedProfit, setEstimatedProfit] = useState('');
-  const [statusMessage, setStatusMessage] = useState('...');
-  const [history, setHistory] = useState([
-    // { date: '15/6/2024', token: 'USDC', loan: '10', pl: '+1.1' },
-  ]);
+  const [statusMessage, setStatusMessage] = useState('');
+  const [history, setHistory] = useState([]);
 
-  localStorage.getItem('user') === 'active' ? localStorage.setItem('user','active') : localStorage.setItem('user','passive'); 
-  // web3 hooks
   const walletAddress = useAddress();
   const { data: userUSDCBalance, isLoading: loadingUSDCToken } = useBalance("0x94a9D9AC8a22534E3FaCa9F4e7F2E2cf85d5E4C8");
   const { contract } = useContract('0x94a9D9AC8a22534E3FaCa9F4e7F2E2cf85d5E4C8'); 
@@ -35,44 +27,36 @@ const Loan = () => {
     error,
   } = useTransferToken(contract);
 
-  // Arena1
   const { contract: FLArbitrage } = useContract('0xd85ef7fca7b28a515cc55714A42B2e31aA548e85');
   const { data: readBalance, isLoading: loadingFLArbitrage, error: FLError } = useContractRead(
     FLArbitrage,
     "getBalance",
     ['0x94a9D9AC8a22534E3FaCa9F4e7F2E2cf85d5E4C8'],
-  )
+  );
 
+  // Handle wallet connection and fetch history
   useEffect(() => {
-    if (!walletAddress) {
-      setConnected(false);
-    } else {
-      setConnected(true);
-      axios.post("http://localhost:5550/loan/historyRead", { address: walletAddress })
-        .then((res) => {
-          const obj = res.data;
-          console.log(res.data);
-          
-          // Create a new array to store updated history
-          const updatedHistory = obj.map((item) => {
-            const date = new Date(item.date);
+    setConnected(!!walletAddress);
+    
+    if (walletAddress) {
+      axios.get(`${import.meta.env.VITE_BACKEND_URL}/api/loans/history/${walletAddress}`)
+        .then((response) => {
+          const updatedHistory = response.data.map(item => {
+            const date = new Date(item.timestamp);
             const d = date.getDate();
             const m = date.getMonth() + 1;
             const y = date.getFullYear();
             return { date: `${d}/${m}/${y}`, token: item.token, loan: item.loan, pl: item.pl };
           });
-  
-          // Update the history state with the new array
           setHistory(updatedHistory);
         })
         .catch((err) => {
-          alert("Failed to fetch loan history");
+          console.error("Failed to fetch loan history:", err);
         });
     }
   }, [walletAddress]);
-  
 
-  // timer
+  // Timer effect
   useEffect(() => {
     const interval = setInterval(() => {
       setTimer(prevTimer => prevTimer - 1);
@@ -80,60 +64,59 @@ const Loan = () => {
     return () => clearInterval(interval);
   }, []); 
 
+  // Check balance when timer hits zero
   useEffect(() => {
     const init = async () => {
       if (timer === 0) {
-        // timer 10 seconds
-        const bal = await FLArbitrage.call("getBalance",['0x94a9D9AC8a22534E3FaCa9F4e7F2E2cf85d5E4C8']);
-        setDepositAmt(bal);
-        console.log("bal" + bal);
-        if(bal > 0) {
-          setStatus("Locked")
+        try {
+          const bal = await FLArbitrage.call("getBalance", ['0x94a9D9AC8a22534E3FaCa9F4e7F2E2cf85d5E4C8']);
+          setDepositAmt(bal);
+          setStatus(bal > 0 ? "Locked" : "Free");
+          setTimer(10);
+        } catch (err) {
+          console.error("Failed to get balance:", err);
+          setStatus("Error");
         }
-        else{
-          setStatus('Free');
-        }
-        console.log("timer:" + bal);
-        setTimer(10);
       }
-    }
+    };
     init();
-  }, [timer]);
+  }, [timer, FLArbitrage]);
 
-  useEffect(() =>{
-    if(loadingUSDCToken){
-      setBalance('Loading...');
-    }
-    else{
-      setBalance(`${userUSDCBalance.displayValue} USDC`);
-    }
-  },[loadingUSDCToken])
+  // Update balance display
+  useEffect(() => {
+    setBalance(loadingUSDCToken ? 'Loading...' : `${userUSDCBalance?.displayValue || '0'} USDC`);
+  }, [loadingUSDCToken, userUSDCBalance]);
 
   const handleWithdraw = async () => {
-    await FLArbitrage.call("withdraw",['0x94a9D9AC8a22534E3FaCa9F4e7F2E2cf85d5E4C8']);
-    localStorage.setItem('user','passive');
-    setStatus('Free'); // write to db
-    setStatusMessage('');
-    setFlash(false);
-  }
+    try {
+      await FLArbitrage.call("withdraw", ['0x94a9D9AC8a22534E3FaCa9F4e7F2E2cf85d5E4C8']);
+      localStorage.setItem('user', 'passive');
+      setStatus('Free');
+      setStatusMessage('');
+      setFlash(false);
+    } catch (err) {
+      console.error("Withdrawal failed:", err);
+      setStatusMessage('Withdrawal failed');
+    }
+  };
 
   const handleArena = async () => {
     try {
-      if(loadingTransferToken){
-        alert("Loading...");
+      if (loadingTransferToken) {
+        alert("Transaction in progress...");
+        return;
       }
-      else{
-        await transferTokens({
-        to: '0xd85ef7fca7b28a515cc55714A42B2e31aA548e85', // transfer to arena1
-        amount: '5', // transferring 5 USDC as minimum safety deposit
-        })
-        localStorage.setItem('user','active');
-        setStatus('Locked'); 
-        setStatusMessage('');
-      }
-    } catch (error) {
-      localStorage.setItem('user','passive');
-      console.log(error);
+      await transferTokens({
+        to: '0xd85ef7fca7b28a515cc55714A42B2e31aA548e85',
+        amount: '5',
+      });
+      localStorage.setItem('user', 'active');
+      setStatus('Locked');
+      setStatusMessage('');
+    } catch (err) {
+      localStorage.setItem('user', 'passive');
+      console.error("Arena transaction failed:", err);
+      setStatusMessage('Transaction failed');
     }
   }
 
@@ -212,135 +195,152 @@ const Loan = () => {
   };
 
   return (
-    <>
-      <div className="min-h-screen bg-black text-white p-8">
-        <div className="flex justify-between items-center mb-8">
-          <button className="text-white font-bold py-3 px-6 rounded-lg shadow-lg ml-auto">
-            <ConnectWallet />
-          </button>
-        </div>
-        <div className="bg-zinc-900 border-zinc-700 border-[1px] p-6 rounded-lg shadow-lg">
-          <p className="text-lg">Required USDC Balance: 5 USDC</p>
-          <p className="text-lg">Available USDC Balance: {balance}</p>
-        </div>
-        <br />
-        <h1 className="text-3xl font-bold">Arenas</h1>
-        <p className='text-2xl text-green-500' ><em>Deposit 5 USDC to lock the arena!</em></p>
-        <br />
-        <div className="grid grid-cols-2 gap-6 mb-8">
-          <div className="bg-zinc-900 border-zinc-700 border-[1px] p-6 rounded-lg shadow-lg cursor-pointer">
-            <p className='text-lg text-red-300'>New quotes in 00:{timer}</p>
-            <p className="text-lg">Contract: 0xd85....8e85</p>
-            <p className="text-lg">Status: {status}</p>
-            <button
-            className="bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-6 rounded-lg shadow-lg"
-            onClick={handleStatus}
-          >
-            Avail Status
-          </button>
-          {status === 'Free' && (
-            <button
-            className="ml-5 bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-6 rounded-lg shadow-lg"
-            onClick={handleArena}
-          >
-            Deposit
-          </button>
-          )}
-          {localStorage.getItem('user') === 'active' && (
-            <button
-            className="ml-5 bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-6 rounded-lg shadow-lg"
-            onClick={handleWithdraw}
-          >
-            Withdraw
-          </button>
-          )}
+    <div className="min-h-screen bg-gradient-to-b from-[#0a0a0a] to-black text-white p-4 sm:p-8">
+      <div className="max-w-6xl mx-auto">
+        {/* Header Section */}
+        <div className="flex flex-col sm:flex-row justify-between items-center gap-6 mb-8">
+          <div className="w-full sm:w-auto">
+            <ConnectWallet 
+              theme="dark"
+              btnTitle="Connect Wallet"
+              className="!bg-gradient-to-r from-emerald-500 to-teal-500 !text-white"
+            />
           </div>
-          <div className="bg-zinc-900 border-zinc-700 border-[1px] p-6 rounded-lg shadow-lg cursor-pointer">
-            <p className="text-lg">Contract: 0xdef...456</p>
-            <p className="text-lg">Status: Locked</p>
+          <div className="flex flex-col items-end space-y-2">
+            <div className="text-sm text-gray-400">Required USDC Balance: <span className="text-emerald-500 font-medium">5 USDC</span></div>
+            <div className="text-sm text-gray-400">Available USDC Balance: <span className="text-white font-medium">{balance}</span></div>
           </div>
         </div>
+
+        {/* Arenas Section */}
         <div className="mb-8">
-          <label className="block mb-3 text-xl">Loan Amount</label>
-          {localStorage.getItem('user') === 'passive' && (
-            <p className='text-mg text-red-200'><em>please lock an arena to get flash loan</em></p>
+          <h2 className="text-2xl font-bold mb-6 text-gradient">Flash Loan Arenas</h2>
+          <div className="grid md:grid-cols-2 gap-6">
+            {/* Arena 1 */}
+            <div className="bg-[#1a1a1a] rounded-xl p-6 border border-gray-800 shadow-xl">
+              <div className="flex justify-between items-start mb-4">
+                <div>
+                  <h3 className="text-lg font-semibold mb-2">Arena 1: USDC-DAI</h3>
+                  <p className="text-sm text-gray-400">Next update in: {timer}s</p>
+                </div>
+                <div className={`px-3 py-1 rounded-full text-sm ${
+                  status === 'Free' ? 'bg-emerald-500/20 text-emerald-500' :
+                  status === 'Locked' ? 'bg-yellow-500/20 text-yellow-500' :
+                  'bg-gray-500/20 text-gray-500'
+                }`}>
+                  {status}
+                </div>
+              </div>
+              <div className="space-y-4">
+                <button
+                  onClick={handleArena}
+                  disabled={status !== 'Free' || !connected}
+                  className={`w-full py-3 px-4 rounded-lg font-medium transition-all duration-300 ${
+                    status === 'Free' && connected
+                      ? 'bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white'
+                      : 'bg-gray-800 text-gray-500 cursor-not-allowed'
+                  }`}
+                >
+                  {status === 'Free' ? 'Lock Arena (5 USDC)' : 'Arena Locked'}
+                </button>
+                <button
+                  onClick={handleWithdraw}
+                  disabled={status !== 'Locked' || !connected}
+                  className={`w-full py-3 px-4 rounded-lg font-medium transition-all duration-300 ${
+                    status === 'Locked' && connected
+                      ? 'bg-red-500 hover:bg-red-600 text-white'
+                      : 'bg-gray-800 text-gray-500 cursor-not-allowed'
+                  }`}
+                >
+                  Withdraw
+                </button>
+              </div>
+            </div>
+            
+            {/* Flash Loan Section */}
+            <div className="bg-[#1a1a1a] rounded-xl p-6 border border-gray-800 shadow-xl">
+              <h3 className="text-lg font-semibold mb-4">Flash Loan</h3>
+              <div className="space-y-4">
+                <div>
+                  <label className="text-sm text-gray-400 mb-2 block">Loan Amount (USDC)</label>
+                  <input
+                    type="number"
+                    value={loanAmount}
+                    onChange={(e) => setLoanAmount(e.target.value)}
+                    className="w-full bg-[#0a0a0a] border border-gray-800 rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-emerald-500"
+                    placeholder="Enter amount"
+                    disabled={status !== 'Locked'}
+                  />
+                </div>
+                <div>
+                  <label className="text-sm text-gray-400 mb-2 block">Found Pair</label>
+                  <div className="bg-[#0a0a0a] border border-gray-800 rounded-lg px-4 py-3">
+                    {foundPair}
+                  </div>
+                </div>
+                <button
+                  onClick={handleProceed}
+                  disabled={status !== 'Locked' || !loanAmount}
+                  className={`w-full py-3 px-4 rounded-lg font-medium transition-all duration-300 ${
+                    status === 'Locked' && loanAmount
+                      ? 'bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 text-white'
+                      : 'bg-gray-800 text-gray-500 cursor-not-allowed'
+                  }`}
+                >
+                  Flash!
+                </button>
+              </div>
+              {statusMessage && (
+                <div className={`mt-4 p-3 rounded-lg text-sm ${
+                  statusMessage.includes('Success')
+                    ? 'bg-emerald-500/20 text-emerald-500'
+                    : 'bg-red-500/20 text-red-500'
+                }`}>
+                  {statusMessage}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* History Section */}
+        <div className="bg-[#1a1a1a] rounded-xl p-6 border border-gray-800 shadow-xl">
+          <h2 className="text-2xl font-bold mb-6">Transaction History</h2>
+          {history.length > 0 ? (
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr>
+                    <th className="text-left text-gray-400 py-3 px-4 border-b border-gray-800">Date</th>
+                    <th className="text-left text-gray-400 py-3 px-4 border-b border-gray-800">Token</th>
+                    <th className="text-right text-gray-400 py-3 px-4 border-b border-gray-800">Loan Amount</th>
+                    <th className="text-right text-gray-400 py-3 px-4 border-b border-gray-800">Profit/Loss</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {history.map((item, index) => (
+                    <tr key={index} className="hover:bg-[#2a2a2a] transition-colors">
+                      <td className="py-3 px-4 border-b border-gray-800">{item.date}</td>
+                      <td className="py-3 px-4 border-b border-gray-800">{item.token}</td>
+                      <td className="text-right py-3 px-4 border-b border-gray-800">{item.loan} USDC</td>
+                      <td className={`text-right py-3 px-4 border-b border-gray-800 ${
+                        item.pl.startsWith('+') ? 'text-emerald-500' : 'text-red-500'
+                      }`}>
+                        {item.pl}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className="text-center py-8 text-gray-400">
+              {connected ? "No transaction history yet" : "Connect your wallet to view history"}
+            </div>
           )}
-          <input
-            type="number"
-            className="w-full p-3 rounded-lg border-zinc-700 border-[1px] bg-zinc-800 text-white"
-            placeholder="Ex: 4 USDC"
-            value={loanAmount}
-            onChange={(e) => setLoanAmount(e.target.value)}
-          />
-        </div>
-        <div className="mb-6">
-          <button
-            className="bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-6 rounded-lg shadow-lg"
-            onClick={handleFlash}
-          >
-            FLASH!
-          </button>
-        </div>
-        {flash === true && (
-          <div className="bg-zinc-900 border-zinc-700 border-[1px] p-6 rounded-lg shadow-lg mb-8">
-          {/* {statusMessage && <p className="text-lg">{statusMessage}</p>} */}
-          <div className="flex items-center mt-6">
-            <p className="mr-3">Found Pair:</p>
-            <div className="bg-zinc-800 border-zinc-700 border-[1px] p-3 rounded-lg">{foundPair}</div>
-          </div>
-          <div className="flex items-center mt-6">
-            <p className="mr-3">Estimated Profit:</p>
-            <div className="bg-zinc-800 border-zinc-700 border-[1px] p-3 rounded-lg">{estimatedProfit}</div>
-          </div>
-          <div className="mt-6">
-            <button
-              className="bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-6 rounded-lg shadow-lg"
-              onClick={handleProceed}
-            >
-              Proceed
-            </button>
-          </div>
-        </div>
-        )}
-        <div className="bg-zinc-900 border-zinc-700 border-[1px] p-6 rounded-lg shadow-lg mb-8">
-          {statusMessage === 'Success, Please withdraw your amount!' && <p className="text-green-500">{statusMessage}</p>}
-          {statusMessage === 'Error' && <p className="text-red-500">{statusMessage}</p>}
-        </div>
-        <div className="bg-zinc-900  p-6 rounded-lg shadow-lg">
-          <h2 className="text-2xl font-bold mb-6">History</h2>
-          <table className="w-full text-left">
-            <thead>
-              <tr>
-                <th className="border-b-2 border-zinc-700 text-2xl font-light text-zinc-500 p-3">Date</th>
-                <th className="border-b-2 border-zinc-700 text-2xl font-light text-zinc-500 p-3">Token</th>
-                <th className="border-b-2 border-zinc-700 text-2xl font-light text-zinc-500 p-3">Loan</th>
-                <th className="border-b-2 border-zinc-700 text-2xl font-light text-zinc-500 p-3">P/L</th>
-              </tr>
-            </thead>
-            {connected && (
-              <tbody>
-              {history.map((entry, index) => (
-                <tr key={index}>
-                  <td className="border-b border-zinc-700 p-3">{entry.date}</td>
-                  <td className="border-b border-zinc-700 p-3">{entry.token}</td>
-                  <td className="border-b border-zinc-700 text-yellow-500 p-3">{entry.loan}</td>
-                  <td className="border-b border-zinc-700 p-3 text-green-500">
-                    <div className="flex ">
-                      <FiArrowUp size={24} />
-                      <div>{entry.pl}</div>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-            )}
-            {!connected && (
-              <p>Connect your wallet!!</p>
-            )}
-          </table>
         </div>
       </div>
-    </>
+    </div>
   );
 };
 
