@@ -128,21 +128,26 @@ dmypy.json
 # Pyre type checker
 .pyre/
 
-# Data files (large datasets)
-*.csv
-!*sample*.csv
+# Large data files (keep sample data and small datasets)
+data/large_datasets/
+data/*.csv
+!data/tableau_sample.csv
+!data/*sample*.csv
 *.xlsx
 *.xls
-*.json
+
+# Large model files (keep small/essential models)
+models/large_models/
+models/*.h5
+models/*.hdf5
+# Allow model.pkl and train.py to be tracked
+!models/model.pkl
+!models/train.py
+
+# JSON files (allow package.json, tsconfig.json, etc.)
 !package*.json
 !tsconfig.json
-
-# Machine Learning Models (can be large)
-*.pkl
-*.joblib
-*.h5
-*.hdf5
-*.model
+!*.config.json
 
 # API Keys and Secrets
 .env
